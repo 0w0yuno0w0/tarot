@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script type="importmap">{"imports":{"onnxruntime-web":"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.bundle.min.mjs","onnxruntime-web/webgpu":"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.webgpu.bundle.min.mjs"}}</script>
+<title>Tarot Card Maker | FF14スクリーンショットでタロットカード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--gd:#c9aa5c;--mu:#a9a293;--ln:#4b443a;--pn:#2b2722}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:#ece8dc;background:#14120f radial-gradient(110% 70% at 50% 0,#2a251e,#14120f 65%) no-repeat fixed;font:15px/1.7 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+header{text-align:center;padding:22px 16px 0}
+h1{margin:0;font:700 24px/1.3 Cinzel,"Shippori Mincho",serif;letter-spacing:.2em;color:var(--gd)}
+header p{margin:6px 0 0;color:var(--mu);font-size:13px}
+main{max-width:940px;margin:0 auto;padding:18px 16px 8px;display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:28px;align-items:start}
+.stage{position:sticky;top:14px}
+canvas{display:block;margin:0 auto;width:min(100%,calc(78vh*7/12));height:auto;touch-action:none;cursor:grab;border-radius:8px;box-shadow:0 12px 40px #0009}
+.panel{display:grid;gap:22px}
+h2{margin:0 0 8px;font:700 15px "Shippori Mincho",serif;letter-spacing:.08em;color:var(--gd)}
+button{font:inherit;color:inherit;background:var(--pn);border:1px solid var(--ln);border-radius:8px;min-height:44px;padding:0 14px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gd);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px}
+.grid button.on{background:var(--gd);color:#1a1530;border-color:var(--gd);font-weight:700}
+#themes{display:flex;flex-wrap:wrap;gap:8px}
+.sw.on{outline:2px solid var(--gd);outline-offset:2px}
+label.r{display:grid;grid-template-columns:5.5em 1fr;align-items:center;gap:8px;color:var(--mu);font-size:13px}
+input[type=range]{width:100%;min-height:32px;accent-color:var(--gd)}
+.hint{margin:8px 0 0;color:var(--mu);font-size:13px}
+#dl{width:100%;min-height:52px;background:var(--gd);color:#1a1530;border-color:var(--gd);font-weight:700;font-size:16px}
+#dl:disabled,#rec:disabled{opacity:.4;cursor:not-allowed}#rec{width:100%;min-height:48px}
+footer{max-width:940px;margin:0 auto;padding:18px 16px 28px;text-align:center;color:#6f729c;font-size:11px}
+@media(max-width:760px){main{grid-template-columns:1fr;gap:20px}.stage{position:static}canvas{width:min(100%,calc(66vh*7/12))}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tarot Card Maker</h1>
+  <p>FF14のスクリーンショットから、AIがキャラだけを切り抜いて、動く豪華なタロットカードに仕立てます</p>
+</header>
+<main>
+  <div class="stage"><canvas id="cv" aria-label="タロットカードのプレビュー"></canvas></div>
+  <div class="panel">
+    <section>
+      <h2>1. 画像を選ぶ</h2>
+      <button id="pick" type="button">スクリーンショットを選ぶ</button>
+      <input id="f" type="file" accept="image/*" hidden>
+      <p class="hint" id="st">キャラの切り抜きはAIがあなたの端末内で行い、画像は送信されません。初回のみ大きめ（数十〜100MB前後）のAIモデルを読み込みます。2回目以降はキャッシュで速くなります。</p>
+    </section>
+    <section>
+      <h2>2. 位置ときらめき</h2>
+      <label class="r">大きさ<input id="z" type="range" min=".4" max="2.5" step="0.01" value="1"></label>
+      <label class="r">左 ↔ 右<input id="x" type="range" min="-400" max="400" value="0"></label>
+      <label class="r">上 ↔ 下<input id="y" type="range" min="-400" max="400" value="0"></label>
+      <label class="r">きらめき<input id="g" type="range" min="0" max="100" value="70"></label>
+      <p class="hint">カードの上をドラッグ・ピンチ（PCはホイール）しても動かせます。</p>
+    </section>
+    <section>
+      <h2>3. 数字を選ぶ</h2>
+      <div class="grid" id="ng"></div>
+      <p class="hint"><span id="cur"></span>　<button id="rnd" type="button">ランダム</button></p>
+    </section>
+    <section>
+      <h2>4. 世界観</h2>
+      <div id="themes"></div>
+    </section>
+    <button id="dl" type="button" disabled>PNGでダウンロード</button>
+    <button id="rec" type="button" disabled>動く動画（約6秒）で保存</button>
+  </div>
+</main>
+<footer>© SQUARE ENIX　非公式のファンメイドツールです。FINAL FANTASY は株式会社スクウェア・エニックスの登録商標です。キャラ切り抜き: IMG.LY background-removal (AGPL-3.0)。</footer>
+<script>
+const $=s=>document.querySelector(s),W=840,H=1440,PI=Math.PI,cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+const cv=$('#cv'),c0=cv.getContext('2d');cv.width=W;cv.height=H;let c=c0;
+const mk=(w,h)=>{const e=document.createElement('canvas');e.width=w;e.height=h;return e};
+const RM=['0','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX','XXI'];
+const EN=['The Fool','The Magician','The High Priestess','The Empress','The Emperor','The Hierophant','The Lovers','The Chariot','Strength','The Hermit','Wheel of Fortune','Justice','The Hanged Man','Death','Temperance','The Devil','The Tower','The Star','The Moon','The Sun','Judgement','The World'];
+const JP=['愚者','魔術師','女教皇','女帝','皇帝','教皇','恋人','戦車','力','隠者','運命の輪','正義','吊られた男','死神','節制','悪魔','塔','星','月','太陽','審判','世界'];
+const TH=[
+ {n:'黄金',b:['#120d24','#2b1d52','#7a56b5'],m:['#6b4a14','#f6e6a8','#c9973a','#fff3c4','#b07a22','#5c3d0e'],a:'#ffe7a0'},
+ {n:'月光',b:['#06121e','#123350','#5a98bd'],m:['#3b4256','#f4f7ff','#a9b4cc','#ffffff','#7f8aa3','#2f3548'],a:'#dff0ff'},
+ {n:'紅蓮',b:['#1a0910','#5c1227','#d0583e'],m:['#6a3322','#ffe0cc','#d9906c','#fff0e4','#b0603f','#5a2a1a'],a:'#ffd9b8'},
+ {n:'翡翠',b:['#051910','#10462f','#55b283'],m:['#5a4412','#f1e3a0','#bf9a38','#fff2bd','#a07f25','#4c3a0d'],a:'#d8ffe8'}];
+let cut=null,photo=null,mode='',msg='画像を選んでください',zoom=1,ox=0,oy=0,num=0,th=0,amt=.7,fc={},tc={},busy=false;
+const spr=mk(1,1),ring=mk(1000,1000),glow=mk(64,64);
+let sd=7;const rn=()=>(sd=(sd*1664525+1013904223)%4294967296)/4294967296;
+const ST=Array.from({length:90},()=>[rn()*W,rn()*H,3+rn()*6,rn()*6.3,1+rn()*2.5]);
+const PT=Array.from({length:80},()=>({x:rn()*W,y:rn()*(H+80),v:12+rn()*40,f:.4+rn()*1.2,p:rn()*6.3,a:6+rn()*22,s:6+rn()*12}));
+
+function rr(x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+// アーチ窓の輪郭に沿った点と外向き法線
+function ap(u,o){const Lv=720,La=PI*300,d=u*(2*Lv+La);
+  if(d<Lv)return[120-o,1235-d,-1,0];
+  if(d<Lv+La){const a=PI+(d-Lv)/300;return[420+Math.cos(a)*(300+o),515+Math.sin(a)*(300+o),Math.cos(a),Math.sin(a)]}
+  return[720+o,515+d-Lv-La,1,0]}
+function archP(o,keep){if(!keep)c.beginPath();const l=120-o,r=720+o,y=1235+o*.5;c.moveTo(l,y);c.lineTo(l,515);c.arc(420,515,300+o,PI,0);c.lineTo(r,y);c.closePath()}
+const mgr=(x0,y0,x1,y1)=>{const g=c.createLinearGradient(x0,y0,x1,y1);TH[th].m.forEach((s,i)=>g.addColorStop([0,.2,.4,.55,.75,1][i],s));return g};
+
+// ---- 豪華な金属フレーム（静的レイヤー。解像度ごとにキャッシュ） ----
+function band(o,w,M){archP(o);c.lineWidth=w+5;c.strokeStyle=TH[th].m[5];c.stroke();c.lineWidth=w;c.strokeStyle=M;c.stroke();c.lineWidth=Math.max(1,w*.18);c.strokeStyle='rgba(255,255,255,.45)';c.stroke()}
+function spiral(x,y,R,rot,dir,M){c.beginPath();for(let i=0;i<=70;i++){const a=i/70*PI*3.4,r=R*Math.exp(-a*.3),X=x+Math.cos(rot+a*dir)*r,Y=y+Math.sin(rot+a*dir)*r;i?c.lineTo(X,Y):c.moveTo(X,Y)}
+  c.lineWidth=11;c.strokeStyle=TH[th].m[5];c.stroke();c.lineWidth=6.5;c.strokeStyle=M;c.stroke()}
+function leaf(x,y,a,L,M){c.save();c.translate(x,y);c.rotate(a);c.beginPath();c.moveTo(0,0);c.quadraticCurveTo(L*.5,-L*.38,L,0);c.quadraticCurveTo(L*.5,L*.38,0,0);c.fillStyle=M;c.fill();c.lineWidth=2;c.strokeStyle=TH[th].m[5];c.stroke();c.restore()}
+const GC=['#e8265f','#2f86f0','#2fd29a','#ffcc33'];
+function gem(x,y,r,i){const g=c.createRadialGradient(x-r*.35,y-r*.35,r*.05,x,y,r);g.addColorStop(0,'#fff');g.addColorStop(.3,GC[i%4]);g.addColorStop(1,'rgba(0,0,0,.7)');
+  c.beginPath();c.arc(x,y,r+3.5,0,7);c.fillStyle=TH[th].m[5];c.fill();c.lineWidth=3;c.strokeStyle=mgr(x-r,y-r,x+r,y+r);c.stroke();c.beginPath();c.arc(x,y,r,0,7);c.fillStyle=g;c.fill()}
+function buildFrame(S){
+  const T=TH[th],e=mk(W*S,H*S),sv=c;c=e.getContext('2d');c.setTransform(S,0,0,S,0,0);c.lineJoin=c.lineCap='round';
+  const M=mgr(0,0,W,H*.8),sg=num%2?1:-1;
+  c.fillStyle='rgba(4,3,10,.55)';c.beginPath();c.rect(0,0,W,H);archP(0,1);c.fill('evenodd');
+  rr(14,14,W-28,H-28,30);c.lineWidth=8;c.strokeStyle=T.m[5];c.stroke();c.lineWidth=5;c.strokeStyle=M;c.stroke();
+  rr(30,30,W-60,H-60,20);c.lineWidth=1.5;c.globalAlpha=.7;c.stroke();c.globalAlpha=1;
+  for(const[o,w]of[[52,12],[30,6],[0,22]])band(o,w,M);
+  // 左右非対称：片側に渦の蔓、反対側に三日月
+  const sp=(u,dir,R)=>{const[x,y,nx,ny]=ap(u,52),a=Math.atan2(ny,nx);spiral(x+nx*R*.6,y+ny*R*.6,R,a+PI,dir,M);leaf(x,y,a+.8,36,M);leaf(x,y,a-.8,36,M)};
+  [.05,.13,.22,.31,.4].forEach((x,i)=>sp(sg>0?x:1-x,i%2?1:-1,34+(i%3)*10));
+  [.1,.2,.33].forEach((x,i)=>sp(sg>0?1-x:x,i%2?-1:1,30+i*8));
+  const cx=sg>0?W-96:96;c.beginPath();c.arc(cx,190,60,0,7);c.arc(cx+(sg>0?-18:18),184,42,0,7,true);c.fillStyle=M;c.fill('evenodd');c.lineWidth=2.5;c.strokeStyle=T.m[5];c.stroke();
+  // 太陽の放射と数字のメダリオン
+  for(let i=0;i<24;i++){const a=i*PI/12,L=i%2?72:104;c.beginPath();c.moveTo(420+Math.cos(a-.07)*44,150+Math.sin(a-.07)*44);c.lineTo(420+Math.cos(a)*L,150+Math.sin(a)*L);c.lineTo(420+Math.cos(a+.07)*44,150+Math.sin(a+.07)*44);c.fillStyle=M;c.fill();c.lineWidth=1.5;c.strokeStyle=T.m[5];c.stroke()}
+  c.beginPath();c.arc(420,150,48,0,7);c.fillStyle=M;c.fill();c.lineWidth=3;c.strokeStyle=T.m[5];c.stroke();
+  c.beginPath();c.arc(420,150,38,0,7);c.fillStyle=T.b[0];c.fill();c.lineWidth=2;c.strokeStyle=M;c.stroke();
+  c.fillStyle=mgr(0,120,0,180);c.textAlign='center';c.textBaseline='middle';c.font='700 40px Cinzel,serif';c.fillText(RM[num],420,153);
+  // 宝石
+  let p=ap(.26,21);gem(p[0],p[1],11,0);p=ap(.74,21);gem(p[0],p[1],11,1);
+  const gx=sg>0?W-95:95,gd=sg>0?-1:1;gem(gx,1195,15,2);gem(gx+gd*27,1222,10,3);gem(gx-gd*13,1230,8,0);
+  // ネームプレート
+  c.beginPath();c.moveTo(90,1312);c.quadraticCurveTo(420,1212,750,1312);c.quadraticCurveTo(420,1412,90,1312);c.closePath();
+  c.fillStyle=T.b[0];c.fill();c.lineWidth=15;c.strokeStyle=T.m[5];c.stroke();c.lineWidth=10;c.strokeStyle=M;c.stroke();c.lineWidth=2;c.strokeStyle='rgba(255,255,255,.45)';c.stroke();
+  gem(90,1312,12,0);gem(750,1312,12,2);
+  const en=EN[num].toUpperCase();let fs=44;c.letterSpacing='3px';
+  do{fs-=2;c.font=`600 ${fs}px Cinzel,"Times New Roman",serif`}while(c.measureText(en).width>400&&fs>20);
+  c.fillStyle=mgr(0,1285,0,1315);c.fillText(en,420,1297);
+  c.letterSpacing='2px';c.font='500 24px "Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif';c.fillStyle=mgr(0,1325,0,1350);c.fillText(JP[num],420,1338);c.letterSpacing='0px';
+  const r=c.canvas;c=sv;return r}
+
+// ---- 背景（カード番号ごとに違う幾何学紋様）・光 ----
+function buildGlow(){const k=glow.getContext('2d'),g=k.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'#fff');g.addColorStop(.2,TH[th].a+'dd');g.addColorStop(1,TH[th].a+'00');k.clearRect(0,0,64,64);k.fillStyle=g;k.fillRect(0,0,64,64)}
+function buildRings(){
+  const k=ring.getContext('2d'),n=5+num%7,q=n>=7&&num%2?3:2,tk=12*(1+num%3),V=(i,r)=>[Math.cos(-PI/2+i*2*PI/n)*r,Math.sin(-PI/2+i*2*PI/n)*r];
+  k.clearRect(0,0,1000,1000);k.save();k.translate(500,500);k.strokeStyle=TH[th].a;k.lineWidth=2;
+  for(const r of[470,440,300,170]){k.beginPath();k.arc(0,0,r,0,7);k.stroke()}
+  for(let i=0;i<tk*2;i++){const a=i*PI/tk,L=i%2?12:26;k.beginPath();k.moveTo(Math.cos(a)*440,Math.sin(a)*440);k.lineTo(Math.cos(a)*(440+L),Math.sin(a)*(440+L));k.stroke()}
+  k.lineWidth=2.5;k.beginPath();for(let i=0;i<=n;i++){const v=V(i*q%n,300);i?k.lineTo(v[0],v[1]):k.moveTo(v[0],v[1])}k.stroke();
+  k.beginPath();for(let i=0;i<=n;i++){const v=V(i%n,170);i?k.lineTo(v[0],v[1]):k.moveTo(v[0],v[1])}k.stroke();
+  for(let i=0;i<n;i++){const v=V(i,300);k.beginPath();k.arc(v[0],v[1],16,0,7);k.stroke()}
+  k.restore()}
+function scene(t){
+  const T=TH[th],b=T.b;
+  let g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,b[0]);g.addColorStop(.5,b[1]);g.addColorStop(1,b[0]);c.fillStyle=g;c.fillRect(0,0,W,H);
+  g=c.createRadialGradient(W/2,640,20,W/2,640,560);g.addColorStop(0,b[2]+'dd');g.addColorStop(1,b[2]+'00');c.fillStyle=g;c.fillRect(0,0,W,H);
+  c.globalCompositeOperation='lighter';
+  if(c.createConicGradient){g=c.createConicGradient(t*.06,W/2,640);for(let i=0;i<=24;i++)g.addColorStop(i/24,i%2?'rgba(255,255,255,0)':T.a+'40');c.globalAlpha=.3+.5*amt;c.fillStyle=g;c.fillRect(0,0,W,H)}
+  c.save();c.translate(W/2,640);c.globalAlpha=.5;c.rotate(t*.05);c.drawImage(ring,-500,-500);c.rotate(-t*.11);c.scale(.62,.62);c.globalAlpha=.7;c.drawImage(ring,-500,-500);c.restore();
+  for(const s of ST){const a=.5+.5*Math.sin(t*s[4]+s[3]),z=s[2]*(.5+a*.7);c.globalAlpha=a*.85;c.drawImage(glow,s[0]-z,s[1]-z,z*2,z*2)}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over';parts(t,0)}
+function parts(t,k){c.globalCompositeOperation='lighter';const n=Math.round(PT.length*amt),L=H+80;
+  for(let i=k;i<n;i+=2){const p=PT[i],y=((p.y-t*p.v)%L+L)%L-40,x=p.x+Math.sin(t*p.f+p.p)*p.a,s=p.s*(k?1.5:1);c.globalAlpha=(.35+.65*Math.abs(Math.sin(t*p.f*1.7+p.p)))*(k?.9:.7);c.drawImage(glow,x-s,y-s,s*2,s*2)}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+function flares(t){c.globalCompositeOperation='lighter';
+  for(let i=0;i<6;i++){const[x,y]=ap((t*.04+i/6)%1,21),ph=Math.sin(PI*((t*.5+i*.37)%1)),s=40*ph*amt;if(s<2)continue;
+    c.globalAlpha=ph;c.drawImage(glow,x-s,y-s,s*2,s*2);c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.moveTo(x-s*1.6,y);c.lineTo(x+s*1.6,y);c.moveTo(x,y-s*1.6);c.lineTo(x,y+s*1.6);c.stroke()}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+// 金属の輝きが斜めに流れる
+function frameLayer(t,S){
+  const f=fc[S]||(fc[S]=buildFrame(S)),k=(tc[S]||(tc[S]=mk(W*S,H*S))).getContext('2d');
+  k.setTransform(1,0,0,1,0,0);k.globalCompositeOperation='source-over';k.clearRect(0,0,W*S,H*S);k.drawImage(f,0,0);
+  k.globalCompositeOperation='source-atop';const p=((t*.22)%1.4)*(W+700)-350,g=k.createLinearGradient(p*S,0,(p+260)*S,520*S);
+  g.addColorStop(0,'rgba(255,255,255,0)');g.addColorStop(.5,'rgba(255,248,215,.75)');g.addColorStop(1,'rgba(255,255,255,0)');k.fillStyle=g;k.fillRect(0,0,W*S,H*S);
+  c.drawImage(tc[S],0,0,W,H)}
+
+// ---- キャラ（AI切り抜き）----
+function setCut(bm){
+  const m=Math.min(1,1400/Math.max(bm.width,bm.height)),w=Math.round(bm.width*m),h=Math.round(bm.height*m),sw=160,sh=Math.max(1,Math.round(sw*h/w)),q=mk(sw,sh),s=q.getContext('2d',{willReadFrequently:true});
+  s.drawImage(bm,0,0,sw,sh);const d=s.getImageData(0,0,sw,sh).data;let x0=sw,x1=-1,y0=sh,y1=-1;
+  for(let y=0;y<sh;y++)for(let x=0;x<sw;x++)if(d[(y*sw+x)*4+3]>64){x<x0&&(x0=x);x>x1&&(x1=x);y<y0&&(y0=y);y>y1&&(y1=y)}
+  if(x1<0){x0=0;x1=sw-1;y0=0;y1=sh-1}
+  cut={bm,w,h,bx0:x0/sw*w,bx1:(x1+1)/sw*w,by0:y0/sh*h,by1:(y1+1)/sh*h,bot:y1>=sh-2};buildSprite()}
+// 輪郭の金縁＋発光＋足元フェード
+function buildSprite(){
+  if(!cut)return;const T=TH[th],{bm,w,h}=cut,P=30,sil=mk(w,h),k=sil.getContext('2d');
+  k.drawImage(bm,0,0,w,h);k.globalCompositeOperation='source-in';k.fillStyle=T.m[1];k.fillRect(0,0,w,h);
+  spr.width=w+2*P;spr.height=h+2*P;const s=spr.getContext('2d');
+  s.shadowColor=T.a;s.shadowBlur=30;s.drawImage(sil,P,P);s.shadowBlur=0;
+  for(let i=0;i<16;i++){const a=i*PI/8;s.drawImage(sil,P+Math.cos(a)*5,P+Math.sin(a)*5)}
+  s.drawImage(bm,P,P,w,h);
+  if(cut.bot){s.globalCompositeOperation='destination-out';const g=s.createLinearGradient(0,P+h*.84,0,P+h);g.addColorStop(0,'#0000');g.addColorStop(1,'#000');s.fillStyle=g;s.fillRect(0,P+h*.84,w+2*P,h*.16+P)}}
+function sprite(t){
+  const a=cut,P=30,s=Math.min(660/(a.bx1-a.bx0),1020/(a.by1-a.by0))*zoom*(1+Math.sin(t*.8)*.004),ax=(a.bx0+a.bx1)/2+P,ay=a.by1+P,X=W/2+ox,Y=1225+oy+Math.sin(t*1.1)*4;
+  c.save();c.translate(X,Y);c.scale(1,.2);const g=c.createRadialGradient(0,0,0,0,0,340);g.addColorStop(0,TH[th].b[2]+'dd');g.addColorStop(1,TH[th].b[2]+'00');
+  c.globalCompositeOperation='lighter';c.fillStyle=g;c.beginPath();c.arc(0,0,340,0,7);c.fill();c.restore();
+  c.drawImage(spr,X-ax*s,Y-ay*s,spr.width*s,spr.height*s)}
+function photoLayer(){c.save();archP(0);c.clip();const s=Math.max(600/photo.width,1020/photo.height)*zoom,w=photo.width*s,h=photo.height*s;c.drawImage(photo,420+ox-w/2,725+oy-h/2,w,h);c.restore()}
+
+function render(g,t,S){
+  c=g;c.setTransform(S,0,0,S,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';
+  scene(t);if(mode=='photo'&&photo)photoLayer();frameLayer(t,S);if(mode=='cut'&&spr.width>1)sprite(t);
+  parts(t,1);flares(t);
+  c.globalAlpha=.55;c.fillStyle=TH[th].m[1];c.font='500 14px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.letterSpacing='1px';c.fillText('© SQUARE ENIX',W/2,1408);c.letterSpacing='0px';c.globalAlpha=1;
+  if(msg){c.fillStyle='rgba(0,0,0,.5)';c.fillRect(0,600,W,150);c.fillStyle='#fff';c.font='500 34px "Shippori Mincho",serif';c.fillText(msg,W/2,675)}
+  c.globalCompositeOperation='destination-in';rr(0,0,W,H,36);c.fillStyle='#000';c.fill();c.globalCompositeOperation='source-over'}
+let t0=performance.now(),lf=0;
+(function loop(n){requestAnimationFrame(loop);if(n-lf<30)return;lf=n;render(c0,(n-t0)/1000,1)})(0);
+
+// ---- 画像読み込み＆AI切り抜き ----
+const st=(m,b)=>{$('#st').textContent=m;msg=b?m:''};
+async function cutout(f){
+  const lib=await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/dist/index.mjs');
+  // 端末負荷が大きいWebGPUは使わず、安定するCPU(WASM)で実行。スマホは軽量モデル(約44MB)
+  return lib.removeBackground(f,{device:'cpu',model:matchMedia('(pointer:coarse)').matches?'isnet_quint8':'isnet_fp16',output:{format:'image/png'},
+    progress:(k,a,b)=>st((k.startsWith('fetch')?'AIモデルをダウンロード中 ':'キャラを切り抜き中 ')+Math.round(a/b*100)+'%',1)})}
+async function load(f){
+  if(!f||!f.type.startsWith('image/')||busy)return;
+  busy=true;mode='';cut=null;photo=null;spr.width=1;$('#dl').disabled=$('#rec').disabled=true;st('AIを準備中…',1);
+  try{setCut(await createImageBitmap(await cutout(f)));mode='cut';st('完成！カードをドラッグ・ピンチで微調整できます。')}
+  catch(e){const why=String(e&&e.message||e).slice(0,100);console.warn('cutout failed: '+why);
+    photo=await createImageBitmap(f);mode='photo';
+    st(`AIの切り抜きに失敗したため、写真のまま表示しています（原因: ${why}）。AIモデルのダウンロードが必要なので、ネットに接続できる通常のWebページ（GitHub Pagesなど）で開いてお試しください。`)}
+  zoom=1;ox=oy=0;sync();busy=false;$('#dl').disabled=$('#rec').disabled=false}
+$('#pick').onclick=()=>$('#f').click();
+$('#f').onchange=e=>load(e.target.files[0]);
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();load(e.dataTransfer.files[0])});
+cv.addEventListener('click',()=>{if(!mode&&!busy)$('#f').click()});
+
+// ---- 操作 ----
+function sync(){$('#z').value=zoom;$('#x').value=ox;$('#y').value=oy}
+const ptrs=new Map();let pd=0;
+const dist=()=>{const a=[...ptrs.values()];return a.length==2?Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]):0};
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);pd=dist()});
+cv.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)||!mode)return;const p=ptrs.get(e.pointerId);
+  if(ptrs.size==1){const r=W/cv.getBoundingClientRect().width;ox+=(e.clientX-p[0])*r;oy+=(e.clientY-p[1])*r}
+  ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ptrs.size==2){const d=dist();if(pd)zoom=cl(zoom*d/pd,.4,2.5);pd=d}
+  ox=cl(ox,-400,400);oy=cl(oy,-400,400);sync()});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,e=>{ptrs.delete(e.pointerId);pd=0}));
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom=cl(zoom*(e.deltaY<0?1.06:1/1.06),.4,2.5);sync()},{passive:false});
+$('#z').oninput=e=>zoom=+e.target.value;$('#x').oninput=e=>ox=+e.target.value;$('#y').oninput=e=>oy=+e.target.value;$('#g').oninput=e=>amt=e.target.value/100;
+
+const ng=$('#ng');
+EN.forEach((_,i)=>{const b=document.createElement('button');b.type='button';b.textContent=i;b.onclick=()=>pick(i);ng.append(b)});
+function pick(i){
+  num=i;buildRings();fc={};[...ng.children].forEach((b,j)=>{b.classList.toggle('on',j==i);b.setAttribute('aria-pressed',j==i)});
+  $('#cur').textContent=`${i}　${JP[i]}（${EN[i]}）`}
+$('#rnd').onclick=()=>pick(Math.random()*22|0);
+const tg=$('#themes');
+TH.forEach((t,i)=>{
+  const b=document.createElement('button');b.type='button';b.className='sw'+(i?'':' on');b.textContent=t.n;
+  b.style.cssText=`background:linear-gradient(135deg,${t.b[0]},${t.b[2]});color:#fff;border-color:${t.m[2]}`;
+  b.onclick=()=>{th=i;[...tg.children].forEach((x,j)=>x.classList.toggle('on',j==i));buildGlow();buildRings();buildSprite();fc={}};
+  tg.append(b)});
+
+// ---- 保存（PNGは2倍解像度で同じ描画をキャプチャ／動画は約6秒録画）----
+const save=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+const fn=x=>`tarot-${String(num).padStart(2,'0')}-${EN[num].toLowerCase().replace(/ /g,'-')}.${x}`;
+$('#dl').onclick=()=>{
+  const e=mk(W*2,H*2);render(e.getContext('2d'),(performance.now()-t0)/1000,2);delete fc[2];delete tc[2];
+  e.toBlob(b=>save(b,fn('png')),'image/png')};
+$('#rec').onclick=()=>{
+  const b=$('#rec'),mt=['video/mp4;codecs=avc1','video/webm;codecs=vp9','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
+  if(!mt)return alert('このブラウザは動画保存に対応していません。PNG保存をご利用ください。');
+  const ch=[],r=new MediaRecorder(cv.captureStream(30),{mimeType:mt,videoBitsPerSecond:8e6}),old=b.textContent;
+  r.ondataavailable=e=>ch.push(e.data);
+  r.onstop=()=>{save(new Blob(ch,{type:mt}),fn(mt.includes('mp4')?'mp4':'webm'));b.disabled=false;b.textContent=old};
+  r.start();b.disabled=true;let n=6;(function tick(){b.textContent=`録画中… ${n}`;n--<0?r.stop():setTimeout(tick,1000)})()};
+
+buildGlow();pick(0);
+Promise.all([
+  document.fonts.load('700 40px Cinzel','0IVXL'),
+  document.fonts.load('600 40px Cinzel',EN.join('').toUpperCase()),
+  document.fonts.load('500 40px "Shippori Mincho"',JP.join('')+'画像を選んでください')
+]).then(()=>{fc={}}).catch(()=>{});
+</script>
+</body>
+</html>
