@@ -29,7 +29,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gd);outline-off
 #xframes button{width:50px;height:88px;min-height:0;padding:0;overflow:hidden;border-radius:6px}
 #xframes img{width:100%;height:100%;object-fit:cover;display:block}
 details{border:1px solid var(--ln);border-radius:10px;padding:0 14px 12px}
-summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--gd)}
+summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--gd)}
 details h3{margin:16px 0 8px;font-size:13px;color:var(--gd);letter-spacing:.06em}
 details label.r{grid-template-columns:9.5em 1fr;margin-bottom:6px}
 details label.r label{color:inherit;font-size:13px}
@@ -46,6 +46,13 @@ footer{max-width:940px;margin:0 auto;padding:18px 16px 28px;text-align:center;co
 @media(max-width:760px){main{grid-template-columns:1fr;gap:20px}.stage{position:static}canvas{width:min(100%,calc(66vh*.58))}}
 .frp{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px}
 .frp .sw{min-width:64px}
+summary::-webkit-details-marker{display:none}summary::before{content:'＋';display:inline-block;width:1.4em;font-weight:700}details[open]>summary::before{content:'－'}
+
+.ov{position:fixed;inset:0;z-index:50;background:rgba(10,8,6,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px 16px 90px}
+.ov.on{display:flex}.ov img{max-width:100%;max-height:calc(100vh - 150px);object-fit:contain;border-radius:14px;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto}
+.ov p{margin:0;color:#ece8dc;font-size:14px;text-align:center}
+#pvb{position:fixed;right:14px;bottom:14px;z-index:60;display:none;min-height:48px;padding:0 18px;border-radius:24px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+@media(max-width:760px){#pvb{display:block}}
 </style>
 </head>
 <body>
@@ -62,7 +69,7 @@ footer{max-width:940px;margin:0 auto;padding:18px 16px 28px;text-align:center;co
       <input id="f" type="file" accept="image/*" hidden>
       <button id="retry" type="button" disabled>うまく切り抜けない時：補正して再切り抜き</button>
       <details id="adv2">
-        <summary>切り抜きの微調整（詳細設定）</summary>
+        <summary>切り抜きの微調整</summary>
       <label class="r">補正の種類<select id="ppm"><option value="auto">自動</option><option value="dark">暗くして分離（白飛び向け）</option><option value="bright">明るくして分離（暗い画像向け）</option><option value="sat">彩度を強調</option></select></label>
       <label class="r">補正の強さ<input id="ppk" type="range" min="50" max="150" value="100"></label>
       <label class="r">しきい値<input id="ppt" type="range" min="20" max="80" value="50"></label>
@@ -105,7 +112,7 @@ footer{max-width:940px;margin:0 auto;padding:18px 16px 28px;text-align:center;co
       <p class="hint">キャラクターを手描きのイラストのような質感に変えます。初回は数秒かかることがあります。</p>
     </section>
     <details id="adv">
-      <summary>詳細設定（上級者向け）</summary>
+      <summary>詳細設定</summary>
       <h3>レイヤー（前後関係）</h3>
       <label class="r">外枠（側面・上部）<select id="lyo"><option value="back">キャラの後ろ</option><option value="front">キャラの前</option></select></label>
       <label class="r" style="display:none">円環（リング）<select id="lyr"><option value="back">キャラの後ろ</option><option value="front">キャラの前</option></select></label>
@@ -113,14 +120,12 @@ footer{max-width:940px;margin:0 auto;padding:18px 16px 28px;text-align:center;co
       <label class="r" style="display:none">上端の高さ<input id="ply" type="range" min="900" max="1600" step="1" value="1330"></label>
       <label class="r" style="display:none">左端<input id="plx0" type="range" min="0" max="470" step="1" value="0"></label>
       <label class="r" style="display:none">右端<input id="plx1" type="range" min="470" max="940" step="1" value="940"></label>
-      <h3>余白と文字</h3>
-      <label class="r">外側の余白の色<span><input id="mgc" type="color" value="#ece2c9"> <label><input id="mgt" type="checkbox"> 透明にする</label></span></label>
-      <label class="r">文字の色<select id="txc"><option value="auto">自動</option><option value="#2a1d12">濃い色</option><option value="#f4ead0">明るい色</option></select></label>
+      <div hidden><input id="mgc" type="color" value="#ece2c9"><input id="mgt" type="checkbox"><select id="txc"><option value="auto">自動</option></select><input id="bgt" type="checkbox"></div>
       <h3>背景（一番後ろ）</h3>
       <label class="r">背景の色（上）<input id="bgc0" type="color" value="#bdae80"></label>
       <label class="r">背景の色（下）<input id="bgc1" type="color" value="#a99a68"></label>
       <label class="r">光線<span><label><input id="bgy" type="checkbox" checked> 背景に光線を描く</label></span></label>
-      <label class="r">背景<span><label><input id="bgt" type="checkbox"> 透明にする</label> <button id="bgr" type="button" class="mini">窓の色（テーマ）に戻す</button></span></label>
+      <label class="r">背景<span><button id="bgr" type="button" class="mini">窓の色（テーマ）に戻す</button></span></label>
       <h3>枠の色</h3>
       <label class="r">枠の色<span><input id="frc" type="color" value="#7a9a9a"> <button id="frr" type="button" class="mini">元の色に戻す</button></span></label>
       <label class="r">色の強さ<input id="fra" type="range" min="0" max="100" value="100"></label>
@@ -129,6 +134,9 @@ footer{max-width:940px;margin:0 auto;padding:18px 16px 28px;text-align:center;co
     <button id="dl" type="button" disabled>PNGでダウンロード</button>
   </div>
 </main>
+<div id="ovp" class="ov"><img id="ovpi" alt="プレビュー"></div>
+<div id="ovd" class="ov"><img id="ovdi" alt="完成画像"><p>画像を長押しして「写真に追加」などで保存できます。</p><button id="ovdc" type="button">閉じる</button></div>
+<button id="pvb" type="button">プレビュー</button>
 <footer>© SQUARE ENIX　非公式のファンメイドツールです。FINAL FANTASY は株式会社スクウェア・エニックスの登録商標です。キャラ切り抜き: IMG.LY background-removal (AGPL-3.0)。</footer>
 <script>
 const $=s=>document.querySelector(s),W=940,H=1620,PI=Math.PI,cl=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -146,10 +154,10 @@ function hx2rgb(h){const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
 function rgb2hx(a){return'#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('')}
 function rayCol(){const a=hx2rgb(BGX.c0),b=hx2rgb(BGX.c1),m=a.map((v,i)=>(v+b[i])/2),L=(.299*m[0]+.587*m[1]+.114*m[2])/255;return rgb2hx(L>.5?m.map(v=>v*.55):m.map(v=>v+(255-v)*.4))}
 const TH=[
- {n:'原作風',w:['#bdae80','#a99a68'],moon:'#f3efe4',ray:'#5d4c38',a:'#fff1c0',rim:'#fff8e6',tx:'#2f2418'},
- {n:'青磁',w:['#adc2bb','#8ea7a1'],moon:'#f5f7f3',ray:'#3f524e',a:'#f4fff8',rim:'#fbfffd',tx:'#1f2d2a'},
+ {n:'ベージュ',w:['#bdae80','#a99a68'],moon:'#f3efe4',ray:'#5d4c38',a:'#fff1c0',rim:'#fff8e6',tx:'#2f2418'},
+ {n:'セラドン',w:['#adc2bb','#8ea7a1'],moon:'#f5f7f3',ray:'#3f524e',a:'#f4fff8',rim:'#fbfffd',tx:'#1f2d2a'},
  {n:'ローズ',w:['#cdaca7','#b58b87'],moon:'#f8efe8',ray:'#6a4545',a:'#fff0e8',rim:'#fff8f2',tx:'#33201f'},
- {n:'宵',w:['#767c9e','#575d84'],moon:'#efe9d6',ray:'#2c3050',a:'#e8ecff',rim:'#f4f6ff',tx:'#ffffff'}];
+ {n:'スレートブルー',w:['#767c9e','#575d84'],moon:'#efe9d6',ray:'#2c3050',a:'#e8ecff',rim:'#f4f6ff',tx:'#ffffff'}];
 let cut=null,photo=null,mode='',msg='画像を選んでください',zoom=1,ox=0,oy=0,num=0,th=0,amt=0,fx=false,fc={},tc={},wb={},busy=false,need=3,FS=1,flt=0,fk=.85,LY={out:'back',ring:'back',plate:'front'},PL={y:1420,x0:0,x1:W},TXC='auto',MARG={color:'#ece2c9',none:false,user:false},xc={},scn={},LITE=false,SGS=null,XS=null,CELLS=null,CRS=null;
 const spr=mk(1,1),glow=mk(64,64);
 let sd=7;const rn=()=>(sd=(sd*1664525+1013904223)%4294967296)/4294967296;
@@ -1021,7 +1029,7 @@ TH.forEach((t,i)=>{
 const FLN=['なし','水彩','ペン画','版画'],fl=$('#filters');let bq=0;
 FLN.forEach((n,i)=>{const b=document.createElement('button');b.type='button';b.className='sw'+(i?'':' on');b.textContent=n;b.style.cssText='background:#2b2722;color:#ece8dc;border-color:#6e5b49';
   b.onclick=async()=>{flt=i;[...fl.children].forEach((x,j)=>x.classList.toggle('on',j==i));if(!cut)return;
-    if(i&&!cut.fc[i]){st('フィルター適用中…',1);await new Promise(r=>setTimeout(r,40))}buildSprite();st(i?'フィルターを適用しました。':'フィルターを外しました。');poke()};fl.append(b)});
+    if(i&&!cut.fc[i]){st('フィルター適用中…',1);await new Promise(r=>setTimeout(r,40))}buildSprite();st(i?'フィルターを適用しました。':'');poke()};fl.append(b)});
 $('#fk').oninput=e=>{fk=e.target.value/100;if(!bq)bq=requestAnimationFrame(()=>{bq=0;buildSprite()})};
 const FN=['組み紐','草花','星空'],fg=$('#frames'),xg=$('#xframes'),PLD=[1330,1420,1330];
 const syncPL=()=>{$('#ply').value=PL.y;$('#plx0').value=PL.x0;$('#plx1').value=PL.x1};
@@ -1029,7 +1037,7 @@ function setFS(i){FS=i;const ex=i>=3;for(const k in xc)if(Math.floor(k/10)!=i)de
   [...fg.children].forEach((x,j)=>x.classList.toggle('on',j==i));[...xg.children].forEach((x,j)=>x.classList.toggle('on',j+3==i));
   if(ex&&!MARG.user&&!MARG.none){const c_=FRM[i-3].mg||(FRM[i-3].dk?'#161310':'#ece2c9');if(c_!=MARG.color){MARG.color=c_;xc={}}$('#mgc').value=MARG.color}
   syncPL();poke()}
-FN.forEach((n,i)=>{if(i!=1)return;const b=document.createElement('button');b.type='button';b.className='sw on';b.textContent=n;b.style.cssText='background:#2b2722;color:#ece8dc;border-color:#6e5b49';b.onclick=()=>setFS(i);fg.append(b)});
+FN.forEach((n,i)=>{if(i!=1)return;const b=document.createElement('button');b.type='button';b.className='sw on';b.textContent='デフォルト';b.style.cssText='background:#2b2722;color:#ece8dc;border-color:#6e5b49';b.onclick=()=>setFS(i);fg.append(b);const nt=document.createElement('span');nt.className='hint';nt.style.marginLeft='8px';nt.textContent='色の変更はできません';fg.append(nt)});
 FRM.forEach((f,i)=>{const b=document.createElement('button');b.type='button';b.className='sw';b.title=f.n;b.setAttribute('aria-label','枠：'+f.n);b.innerHTML=`<img alt="" src="${f.th}">`;b.onclick=()=>setFS(i+3);xg.append(b)});
 const LYS={dyn:{out:'back',ring:'back',plate:'front'},con:{out:'front',ring:'front',plate:'front'}};
 function setLayer(k){LY={...LYS[k]};$('#lyD').classList.toggle('on',k=='dyn');$('#lyC').classList.toggle('on',k=='con');$('#lyo').value=LY.out;$('#lyr').value=LY.ring;$('#lyp').value=LY.plate;poke()}
@@ -1062,9 +1070,13 @@ syncPL();
 // ---- 保存（PNGは2倍解像度で同じ描画をキャプチャ）----
 const save=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
 const fn=x=>`tarot-${String(num).padStart(2,'0')}-${EN[num].toLowerCase().replace(/ /g,'-')}.${x}`;
+const isMob=()=>matchMedia('(max-width:760px)').matches;
 $('#dl').onclick=()=>{
   const e=mk(W*2,H*2);render(e.getContext('2d'),fx?(performance.now()-t0)/1000:0,2);delete fc[FS*10+2];delete tc[2];delete xc[FS*10+2];delete scn[2];
-  e.toBlob(b=>save(b,fn('png')),'image/png')};
+  e.toBlob(b=>{if(isMob()){const im=$('#ovdi');if(im.src&&im.src.startsWith('blob:'))URL.revokeObjectURL(im.src);im.src=URL.createObjectURL(b);$('#ovd').classList.add('on');$('#pvb').style.display='none'}else save(b,fn('png'))},'image/png')};
+$('#ovdc').onclick=()=>{$('#ovd').classList.remove('on');$('#pvb').style.display=''};
+$('#pvb').onclick=()=>{const o=$('#ovp'),on=o.classList.toggle('on');if(on){poke();setTimeout(()=>{if(o.classList.contains('on'))$('#ovpi').src=$('#cv').toDataURL('image/png')},120);$('#pvb').textContent='設定に戻る'}else $('#pvb').textContent='プレビュー'};
+$('#ovp').onclick=()=>{$('#ovp').classList.remove('on');$('#pvb').textContent='プレビュー'};
 
 
 buildGlow();pick(0);
